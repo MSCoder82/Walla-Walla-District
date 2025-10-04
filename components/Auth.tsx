@@ -1,0 +1,158 @@
+import React, { useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { UsaceLogoIcon } from './Icons';
+
+const Auth: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage('');
+    setIsError(false);
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      // The onAuthStateChange listener in App.tsx will handle the redirect.
+    } catch (error: any) {
+      setIsError(true);
+      setMessage(error.error_description || error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage('');
+    setIsError(false);
+    
+    try {
+      setLoading(true);
+      // 1. Attempt to sign up the user
+      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+
+      if (authError) {
+        // If an error occurs (e.g., user already exists), throw it to be caught below.
+        throw authError;
+      }
+
+      // 2. Check if a user object was returned. It should be for a new user.
+      if (authData.user) {
+        // 3. Create a profile for the new user with a default 'staff' role.
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({ id: authData.user.id, role: 'staff' });
+
+        if (profileError) {
+          // This is a critical failure. The user exists in auth but not in profiles.
+          // They won't be able to log in properly.
+          console.error("Failed to create user profile:", profileError);
+          // We can't easily roll back the auth.signUp, so we inform the user.
+          throw new Error("Account registered, but profile creation failed. Please contact support.");
+        }
+        
+        // 4. Success! Inform the user to check their email.
+        setIsError(false);
+        setMessage('Registration successful! Please check your email to confirm your account.');
+
+      } else {
+        // This is an unexpected state if there was no authError.
+        throw new Error("Registration did not complete successfully. Please try again.");
+      }
+
+    } catch (error: any) {
+      setIsError(true);
+      // Provide a more user-friendly message for the most common error.
+      if (error.message.includes('User already registered')) {
+         setMessage('A user with this email already exists. Please use the Sign In button.');
+      } else {
+         setMessage(error.error_description || error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-navy-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <div className="flex justify-center">
+             <UsaceLogoIcon className="h-12 w-auto text-usace-red" />
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            USACE PAO KPI Tracker
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Sign in or create an account to continue
+          </p>
+        </div>
+        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div>
+              <label htmlFor="email-address" className="sr-only">Email address</label>
+              <input
+                id="email-address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-usace-blue focus:border-usace-blue focus:z-10 sm:text-sm"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">Password</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-usace-blue focus:border-usace-blue focus:z-10 sm:text-sm"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {message && (
+             <div className={`p-3 rounded-md text-sm ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                {message}
+             </div>
+          )}
+
+          <div className="flex items-center justify-between gap-4">
+            <button
+              type="submit"
+              onClick={handleLogin}
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-usace-blue hover:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-usace-blue disabled:bg-navy-400"
+            >
+              {loading ? 'Signing In...' : 'Sign In'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSignup}
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-usace-blue text-sm font-medium rounded-md text-usace-blue bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-usace-red disabled:opacity-50"
+            >
+              {loading ? '...' : 'Sign Up'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default Auth;
