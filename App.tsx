@@ -39,44 +39,76 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // This listener handles the entire auth lifecycle: initial load, login, and logout.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    let isActive = true;
+
+    const handleSessionChange = async (newSession: Session | null) => {
+      if (!isActive) return;
+
       setIsLoading(true);
-      setSession(session);
-      if (session) {
+      setSession(newSession);
+
+      if (newSession) {
         try {
           const { data, error } = await supabase
             .from('profiles')
             .select('role')
-            .eq('id', session.user.id)
+            .eq('id', newSession.user.id)
             .single();
 
-          if (error && error.code !== 'PGRST116') { 
+          if (error && error.code !== 'PGRST116') {
             throw error;
           }
-          
-          setRole(data?.role as Role || 'staff');
-          // Fetch data after session is confirmed
-          await Promise.all([fetchKpiData(), fetchCampaigns()]);
 
+          if (!isActive) return;
+
+          setRole((data?.role as Role) || 'staff');
+
+          await Promise.all([fetchKpiData(), fetchCampaigns()]);
         } catch (error) {
           const typedError = error as { message?: string; code?: string };
           console.error(
             `Error fetching user role: ${typedError.message || 'An unknown error occurred'}. Code: ${typedError.code || 'N/A'}`
           );
+
+          if (!isActive) return;
           setRole('staff');
         }
       } else {
         setRole(null);
-        setKpiData([]); // Clear data on logout
-        setCampaigns([]); // Clear data on logout
+        setKpiData([]);
+        setCampaigns([]);
       }
-      setIsLoading(false);
+
+      if (isActive) {
+        setIsLoading(false);
+      }
+    };
+
+    const loadInitialSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          throw error;
+        }
+        await handleSessionChange(data?.session ?? null);
+      } catch (error) {
+        console.error('Error retrieving initial session:', error);
+        await handleSessionChange(null);
+      }
+    };
+
+    loadInitialSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSessionChange(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+    };
   }, [fetchKpiData, fetchCampaigns]);
 
 
