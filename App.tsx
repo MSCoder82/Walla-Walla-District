@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { KpiDataPoint, View, Role, Campaign } from './types';
-import { NAVIGATION_ITEMS } from './constants';
+import { NAVIGATION_ITEMS, MOCK_KPI_DATA, MOCK_CAMPAIGN_DATA } from './constants';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -20,32 +20,60 @@ const App: React.FC = () => {
   const [role, setRole] = useState<Role | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const isSupabaseAvailable = isSupabaseConfigured;
+  const isDemoMode = !isSupabaseAvailable;
+
   const fetchKpiData = useCallback(async () => {
+    if (!isSupabaseAvailable) {
+      setKpiData(MOCK_KPI_DATA.map(item => ({ ...item })));
+      return;
+    }
     const { data, error } = await supabase.from('kpi_data').select('*').order('date', { ascending: false });
     if (error) {
       console.error('Error fetching KPI data:', error);
     } else {
-      setKpiData(data as KpiDataPoint[]);
+      const normalizedData = (data ?? []).map((item) => ({
+        id: item.id,
+        date: item.date,
+        type: (item.type ?? item.entry_type) as KpiDataPoint['type'],
+        metric: item.metric,
+        quantity: item.quantity,
+        notes: item.notes ?? undefined,
+        campaignId: item.campaignId ?? item.campaign_id ?? undefined,
+        link: item.link ?? item.url ?? undefined,
+      }));
+      setKpiData(normalizedData);
     }
-  }, []);
+  }, [isSupabaseAvailable]);
 
   const fetchCampaigns = useCallback(async () => {
+    if (!isSupabaseAvailable) {
+      setCampaigns(MOCK_CAMPAIGN_DATA.map(item => ({ ...item })));
+      return;
+    }
     const { data, error } = await supabase.from('campaigns').select('*').order('start_date', { ascending: false });
     if (error) {
       console.error('Error fetching campaigns:', error);
     } else {
-      setCampaigns(data as Campaign[]);
+      const normalizedCampaigns = (data ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        startDate: item.startDate ?? item.start_date,
+        endDate: item.endDate ?? item.end_date,
+      }));
+      setCampaigns(normalizedCampaigns);
     }
-  }, []);
+  }, [isSupabaseAvailable]);
 
   useEffect(() => {
     let isActive = true;
 
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseAvailable) {
       setSession(null);
-      setRole(null);
-      setKpiData([]);
-      setCampaigns([]);
+      setRole('chief');
+      setKpiData(MOCK_KPI_DATA.map(item => ({ ...item })));
+      setCampaigns(MOCK_CAMPAIGN_DATA.map(item => ({ ...item })));
       setIsLoading(false);
 
       return () => {
@@ -121,16 +149,34 @@ const App: React.FC = () => {
       isActive = false;
       subscription?.unsubscribe();
     };
-  }, [fetchKpiData, fetchCampaigns, isSupabaseConfigured]);
+  }, [fetchKpiData, fetchCampaigns, isSupabaseAvailable]);
 
 
   const addKpiDataPoint = useCallback(async (newDataPoint: Omit<KpiDataPoint, 'id'>) => {
+    if (isDemoMode) {
+      setKpiData(prevData => {
+        const nextId = prevData.length > 0 ? Math.max(...prevData.map(item => item.id)) + 1 : 1;
+        const entry: KpiDataPoint = { id: nextId, ...newDataPoint };
+        return [entry, ...prevData];
+      });
+      setActiveView('table');
+      return;
+    }
     if (!session?.user) {
         console.error("No user session found. Cannot add KPI data.");
         return;
     }
     const { error } = await supabase.from('kpi_data').insert([
-      { ...newDataPoint, user_id: session.user.id }
+      {
+        date: newDataPoint.date,
+        type: newDataPoint.type,
+        metric: newDataPoint.metric,
+        quantity: newDataPoint.quantity,
+        notes: newDataPoint.notes ?? null,
+        campaign_id: newDataPoint.campaignId ?? null,
+        link: newDataPoint.link ?? null,
+        user_id: session.user.id,
+      }
     ]);
     if (error) {
       console.error('Error inserting KPI data:', error);
@@ -138,15 +184,29 @@ const App: React.FC = () => {
       await fetchKpiData(); // Refetch data
       setActiveView('table'); // Switch to table view
     }
-  }, [session, fetchKpiData]);
+  }, [isDemoMode, session, fetchKpiData]);
 
   const addCampaign = useCallback(async (newCampaign: Omit<Campaign, 'id'>) => {
+    if (isDemoMode) {
+      setCampaigns(prevCampaigns => {
+        const nextId = prevCampaigns.length > 0 ? Math.max(...prevCampaigns.map(item => item.id)) + 1 : 1;
+        const campaign: Campaign = { id: nextId, ...newCampaign };
+        return [campaign, ...prevCampaigns];
+      });
+      return;
+    }
     if (!session?.user) {
         console.error("No user session found. Cannot add campaign.");
         return;
     }
     const { error } = await supabase.from('campaigns').insert([
-        { ...newCampaign, user_id: session.user.id }
+        {
+          name: newCampaign.name,
+          description: newCampaign.description,
+          start_date: newCampaign.startDate,
+          end_date: newCampaign.endDate,
+          user_id: session.user.id
+        }
     ]);
 
     if (error) {
@@ -154,7 +214,7 @@ const App: React.FC = () => {
     } else {
         await fetchCampaigns(); // Refetch campaigns
     }
-  }, [session, fetchCampaigns]);
+  }, [isDemoMode, session, fetchCampaigns]);
   
   const visibleNavItems = useMemo(() => {
     if (!role) return [];
@@ -202,19 +262,19 @@ const App: React.FC = () => {
     );
   }
 
-  if (!session) {
-    return <Auth supabaseAvailable={isSupabaseConfigured} />;
+  if (!session && isSupabaseAvailable) {
+    return <Auth supabaseAvailable={isSupabaseAvailable} />;
   }
 
   return (
     <div className="flex h-screen bg-navy-50 font-sans text-navy-900">
-      <Sidebar 
-        navigationItems={visibleNavItems} 
-        activeView={activeView} 
-        setActiveView={setActiveView} 
+      <Sidebar
+        navigationItems={visibleNavItems}
+        activeView={activeView}
+        setActiveView={setActiveView}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header session={session} />
+        <Header session={session} isDemoMode={isDemoMode} />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-navy-50 p-6 lg:p-8">
           {renderActiveView()}
         </main>
