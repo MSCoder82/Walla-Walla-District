@@ -34,37 +34,18 @@ const Auth: React.FC = () => {
     
     try {
       setLoading(true);
-      // 1. Attempt to sign up the user
-      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+      // This will attempt to sign up the user.
+      const { error } = await supabase.auth.signUp({ email, password });
 
-      if (authError) {
+      if (error) {
         // If an error occurs (e.g., user already exists), throw it to be caught below.
-        throw authError;
+        throw error;
       }
-
-      // 2. Check if a user object was returned. It should be for a new user.
-      if (authData.user) {
-        // 3. Create a profile for the new user with a default 'staff' role.
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({ id: authData.user.id, role: 'staff' });
-
-        if (profileError) {
-          // This is a critical failure. The user exists in auth but not in profiles.
-          // They won't be able to log in properly.
-          console.error("Failed to create user profile:", profileError);
-          // We can't easily roll back the auth.signUp, so we inform the user.
-          throw new Error("Account registered, but profile creation failed. Please contact support.");
-        }
-        
-        // 4. Success! Inform the user to check their email.
-        setIsError(false);
-        setMessage('Registration successful! Please check your email to confirm your account.');
-
-      } else {
-        // This is an unexpected state if there was no authError.
-        throw new Error("Registration did not complete successfully. Please try again.");
-      }
+      
+      // A trigger in the Supabase backend should automatically create the user profile.
+      // This avoids RLS issues with the client trying to write to the profiles table.
+      setIsError(false);
+      setMessage('Registration successful! Please check your email to confirm your account.');
 
     } catch (error: any) {
       setIsError(true);
