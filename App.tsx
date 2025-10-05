@@ -9,7 +9,7 @@ import DataEntry from './components/DataEntry';
 import PlanBuilder from './components/PlanBuilder';
 import Campaigns from './components/Campaigns';
 import Auth from './components/Auth';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -40,6 +40,18 @@ const App: React.FC = () => {
 
   useEffect(() => {
     let isActive = true;
+
+    if (!isSupabaseConfigured) {
+      setSession(null);
+      setRole(null);
+      setKpiData([]);
+      setCampaigns([]);
+      setIsLoading(false);
+
+      return () => {
+        isActive = false;
+      };
+    }
 
     const handleSessionChange = async (newSession: Session | null) => {
       if (!isActive) return;
@@ -107,9 +119,9 @@ const App: React.FC = () => {
 
     return () => {
       isActive = false;
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
-  }, [fetchKpiData, fetchCampaigns]);
+  }, [fetchKpiData, fetchCampaigns, isSupabaseConfigured]);
 
 
   const addKpiDataPoint = useCallback(async (newDataPoint: Omit<KpiDataPoint, 'id'>) => {
@@ -191,7 +203,7 @@ const App: React.FC = () => {
   }
 
   if (!session) {
-    return <Auth />;
+    return <Auth supabaseAvailable={isSupabaseConfigured} />;
   }
 
   return (

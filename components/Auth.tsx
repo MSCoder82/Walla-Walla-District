@@ -2,17 +2,35 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { UsaceLogoIcon } from './Icons';
 
-const Auth: React.FC = () => {
+interface AuthProps {
+  supabaseAvailable?: boolean;
+}
+
+const Auth: React.FC<AuthProps> = ({ supabaseAvailable = true }) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
+  const ensureSupabaseConfigured = () => {
+    if (supabaseAvailable) {
+      return true;
+    }
+
+    setIsError(true);
+    setMessage('Supabase credentials are not configured. Update `lib/supabase.ts` with your project URL and anon key to enable authentication.');
+    return false;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
     setIsError(false);
+
+    if (!ensureSupabaseConfigured()) {
+      return;
+    }
 
     try {
       setLoading(true);
@@ -31,7 +49,11 @@ const Auth: React.FC = () => {
     e.preventDefault();
     setMessage('');
     setIsError(false);
-    
+
+    if (!ensureSupabaseConfigured()) {
+      return;
+    }
+
     try {
       setLoading(true);
       // This will attempt to sign up the user.
@@ -51,14 +73,24 @@ const Auth: React.FC = () => {
       setIsError(true);
       // Provide a more user-friendly message for the most common error.
       if (error.message.includes('User already registered')) {
-         setMessage('A user with this email already exists. Please use the Sign In button.');
+        setMessage('A user with this email already exists. Please use the Sign In button.');
       } else {
-         setMessage(error.error_description || error.message);
+        setMessage(error.error_description || error.message);
       }
     } finally {
       setLoading(false);
     }
   };
+
+  const bannerMessage = !supabaseAvailable
+    ? 'Supabase credentials are not configured. Update `lib/supabase.ts` to enable authentication.'
+    : message;
+
+  const bannerStyle = !supabaseAvailable
+    ? 'bg-yellow-100 text-yellow-800'
+    : isError
+    ? 'bg-red-100 text-red-700'
+    : 'bg-green-100 text-green-700';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-navy-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -106,17 +138,17 @@ const Auth: React.FC = () => {
             </div>
           </div>
 
-          {message && (
-             <div className={`p-3 rounded-md text-sm ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                {message}
-             </div>
+          {(!supabaseAvailable || message) && (
+            <div className={`p-3 rounded-md text-sm ${bannerStyle}`}>
+              {bannerMessage}
+            </div>
           )}
 
           <div className="flex items-center justify-between gap-4">
             <button
               type="submit"
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || !supabaseAvailable}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-usace-blue hover:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-usace-blue disabled:bg-navy-400"
             >
               {loading ? 'Signing In...' : 'Sign In'}
@@ -124,7 +156,7 @@ const Auth: React.FC = () => {
             <button
               type="button"
               onClick={handleSignup}
-              disabled={loading}
+              disabled={loading || !supabaseAvailable}
               className="group relative w-full flex justify-center py-2 px-4 border border-usace-blue text-sm font-medium rounded-md text-usace-blue bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-usace-red disabled:opacity-50"
             >
               {loading ? '...' : 'Sign Up'}
