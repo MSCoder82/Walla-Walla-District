@@ -1,9 +1,71 @@
 import { KpiDataPoint, EntryType, NavItem, Campaign } from './types';
 import { HomeIcon, TableCellsIcon, DocumentPlusIcon, ClipboardDocumentListIcon, MegaphoneIcon } from './components/Icons';
 
-export const MOCK_CAMPAIGN_DATA: Campaign[] = [];
+export const MOCK_CAMPAIGN_DATA: Campaign[] = [
+  {
+    id: 1,
+    name: 'Snake River Navigation Safety',
+    description: 'Seasonal outreach encouraging safe recreation along the Lower Snake River.',
+    startDate: '2024-05-01',
+    endDate: '2024-09-30',
+  },
+  {
+    id: 2,
+    name: 'Mill Creek Flood Risk Awareness',
+    description: 'Community education campaign focused on spring flood preparedness.',
+    startDate: '2024-02-15',
+    endDate: '2024-04-30',
+  },
+];
 
-export const MOCK_KPI_DATA: KpiDataPoint[] = [];
+export const MOCK_KPI_DATA: KpiDataPoint[] = [
+  {
+    id: 101,
+    date: '2024-09-10',
+    type: EntryType.OUTTAKE,
+    metric: 'Media pickups',
+    quantity: 14,
+    notes: 'Regional outlets covered the new lock operations schedule.',
+    campaignId: 1,
+  },
+  {
+    id: 102,
+    date: '2024-09-05',
+    type: EntryType.OUTPUT,
+    metric: 'News release',
+    quantity: 3,
+    notes: 'Safety reminder releases distributed to local media partners.',
+    campaignId: 1,
+    link: 'https://example.com/releases/snake-river-safety',
+  },
+  {
+    id: 103,
+    date: '2024-08-28',
+    type: EntryType.OUTTAKE,
+    metric: 'Engagement rate',
+    quantity: 4.8,
+    notes: 'Average engagement across campaign social content.',
+    campaignId: 1,
+  },
+  {
+    id: 104,
+    date: '2024-03-18',
+    type: EntryType.OUTCOME,
+    metric: 'Awareness lift',
+    quantity: 18,
+    notes: 'Post-event survey showed increased awareness of flood risks.',
+    campaignId: 2,
+  },
+  {
+    id: 105,
+    date: '2024-03-12',
+    type: EntryType.OUTTAKE,
+    metric: 'Video views',
+    quantity: 1260,
+    notes: 'Preparedness PSA performance on social channels.',
+    campaignId: 2,
+  },
+];
 
 
 export const NAVIGATION_ITEMS: NavItem[] = [
